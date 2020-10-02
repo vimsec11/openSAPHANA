@@ -1,0 +1,110 @@
+ID: openSAPHANA
+_schema-version: '2.1'
+version: 0.0.1
+modules:
+  - name: db
+    type: hdb
+    path: db
+    parameters:
+      memory: 256M
+      disk-quota: 512M
+    requires:
+      - name: openSAPHANA-db-hdi-container
+        properties:
+          TARGET_CONTAINER: '~{hdi-container-name}'
+      - name: cross-container-service-1
+        group: SERVICE_REPLACEMENTS
+        properties:
+          key: ServiceName_1
+          service: '~{the-service-name}'
+      - name: hdi_user_db
+        group: SERVICE_REPLACEMENTS
+        properties:
+          key: hdi-user-service
+          service: '~{user-container-name}'
+      - name: cross-container-service-2
+        group: SERVICE_REPLACEMENTS
+        properties:
+          key: ServiceName_2
+          service: '~{the-service-name}'
+  - name: srv
+    type: nodejs
+    path: srv
+    parameters:
+      memory: 512M
+      disk-quota: 512M
+    provides:
+      - name: srv_api
+        properties:
+          url: '${default-url}'
+    requires:
+      - name: openSAPHANA-db-hdi-container
+      - name: openSAPHANA_00-uaa
+  - name: web
+    type: html5
+    path: web
+    requires:
+      - name: openSAPHANA_00-uaa
+      - name: xsjs_api
+        group: destinations
+        properties:
+          name: xsjs_api
+          url: '~{url}'
+          forwardAuthToken: true
+      - name: srv_api
+        group: destinations
+        properties:
+          name: srv_api
+          url: '~{url}'
+          forwardAuthToken: true
+  - name: user_db
+    type: hdb
+    path: user_db
+    requires:
+      - name: hdi_user_db
+        properties:
+          TARGET_CONTAINER: '~{user-container-name}'
+  - name: xsjs
+    type: nodejs
+    path: xsjs
+    provides:
+      - name: xsjs_api
+        properties:
+          url: '${default-url}'
+    requires:
+      - name: openSAPHANA-db-hdi-container
+      - name: db
+      - name: CROSS_SCHEMA_SFLIGHT
+      - name: openSAPHANA_00-uaa
+resources:
+  - name: openSAPHANA-db-hdi-container
+    type: com.sap.xs.hdi-container
+    properties:
+      hdi-container-name: '${service-name}'
+  - name: cross-container-service-1
+    parameters:
+      service-name: CROSS_SCHEMA_SFLIGHT_00
+    properties:
+      the-service-name: '${service-name}'
+    type: org.cloudfoundry.existing-service
+  - name: hdi_user_db
+    parameters:
+      config:
+        schema: OPENSAP_HANA_USER_00
+    properties:
+      user-container-name: '${service-name}'
+    type: com.sap.xs.hdi-container
+  - name: cross-container-service-2
+    parameters:
+      service-name: opensap-central-container
+    properties:
+      the-service-name: '${service-name}'
+    type: org.cloudfoundry.existing-service
+  - name: CROSS_SCHEMA_SFLIGHT
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: CROSS_SCHEMA_SFLIGHT_00
+  - name: openSAPHANA_00-uaa
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: openSAPHANA_00-uaa
